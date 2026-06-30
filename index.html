@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com; media-src 'self' blob:" />
+<title>cortex — topologies of thought</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='6' fill='%2300e5ff'/><circle cx='16' cy='16' r='12' fill='none' stroke='%23a259ff' stroke-width='1.5' opacity='0.6'/></svg>" />
+<style>
+  :root{ --ink:#f2f6ff; --dim:#8595ad; --amber:#ffae5c; --cyan:#00e5ff; --bg:#04060b; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);overflow:hidden;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:var(--ink)}
+  #cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;
+    transform:scaleX(-1);filter:grayscale(.85) brightness(.42) contrast(1.05)}
+  #cam.off{display:none}
+  #graph{position:fixed;inset:0;width:100%;height:100%}
+  .grain{position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(120% 100% at 50% 40%,transparent 50%,rgba(0,0,0,.6) 100%)}
+
+  .title{position:fixed;left:26px;top:22px;z-index:5;pointer-events:none}
+  .title h1{font-size:20px;font-weight:600;letter-spacing:.01em;text-shadow:0 2px 18px rgba(0,0,0,.9)}
+  .title h1 .spark{color:var(--amber)}
+  .title p{font-size:11px;color:var(--dim);margin-top:4px;letter-spacing:.04em}
+
+  .mode{position:fixed;right:26px;top:22px;z-index:5;text-align:right;pointer-events:none;
+    text-shadow:0 2px 14px rgba(0,0,0,.9);max-width:340px}
+  .mode .tag{font-size:13px;letter-spacing:.14em}
+  .mode .tag b{color:var(--cyan)}
+  .mode .sub{font-size:11px;color:var(--dim);margin-top:5px;line-height:1.5}
+
+  .switch{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:6;display:flex;gap:8px}
+  .switch button{cursor:pointer;font:inherit;font-size:11px;letter-spacing:.12em;padding:9px 16px;
+    border-radius:30px;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,20,.55);
+    backdrop-filter:blur(8px);color:var(--dim);transition:.18s}
+  .switch button:hover{color:var(--ink);border-color:rgba(255,255,255,.4)}
+  .switch button.active{color:#04060b;background:var(--cyan);border-color:var(--cyan);
+    box-shadow:0 0 24px rgba(0,229,255,.4)}
+
+  .hint{position:fixed;right:26px;bottom:26px;z-index:5;font-size:10px;color:var(--dim);
+    text-align:right;line-height:1.6;text-shadow:0 1px 8px #000;pointer-events:none}
+  .hint b{color:var(--ink)}
+  .dbg{position:fixed;left:26px;bottom:24px;z-index:6;font-size:12px;letter-spacing:.08em;
+    color:var(--cyan);text-shadow:0 1px 8px #000;pointer-events:none}
+  .dbg .hi{color:var(--amber);font-weight:600}
+
+  .curtain{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:20px;background:rgba(4,6,11,.94);text-align:center;padding:26px;transition:opacity .5s}
+  .curtain.hide{opacity:0;pointer-events:none}
+  .curtain h2{font-size:22px;letter-spacing:.04em}
+  .curtain h2 .spark{color:var(--amber)}
+  .curtain p{max-width:470px;font-size:12px;line-height:1.7;color:#9fb0c8}
+  .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .btn{cursor:pointer;font:inherit;font-size:13px;letter-spacing:.08em;padding:12px 22px;border-radius:30px;
+    border:1px solid var(--cyan);background:rgba(0,229,255,.08);color:var(--cyan);transition:.2s}
+  .btn:hover{background:rgba(0,229,255,.18);box-shadow:0 0 24px rgba(0,229,255,.3)}
+  .btn.ghost{border-color:var(--dim);color:var(--dim);background:transparent}
+  .btn[disabled]{opacity:.4;cursor:default}
+  .status{font-size:11px;color:var(--amber);min-height:15px}
+  .curtain small{font-size:10px;color:var(--dim);max-width:560px;line-height:1.6}
+  .curtain small a{color:var(--cyan);text-decoration:none}
+  code{color:var(--amber)}
+
+  /* entry card / disclaimer / how-it-works */
+  .curtain-card{max-width:640px;max-height:92vh;overflow:auto;display:flex;flex-direction:column;
+    align-items:center;gap:15px;text-align:center;padding:4px 6px}
+  .lede{max-width:520px;font-size:13px;color:#bcd0ea;line-height:1.6}
+  .disclaimer{width:100%;max-width:560px;text-align:left;border:1px solid rgba(0,229,255,.3);
+    background:rgba(0,229,255,.06);border-radius:14px;padding:14px 16px}
+  .disclaimer .d-title{font-size:13px;letter-spacing:.03em;color:var(--cyan);font-weight:600;margin-bottom:6px}
+  .disclaimer p{max-width:none;font-size:11.5px;line-height:1.65;color:#cfe0f3;margin:0}
+  .how{width:100%;max-width:560px;text-align:left}
+  .how-title{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+  .how ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+  .how li{font-size:11.5px;line-height:1.55;color:#9fb0c8;padding-left:16px;position:relative}
+  .how li::before{content:"▹";position:absolute;left:0;color:var(--cyan)}
+  .how li b{color:var(--ink)}
+
+  /* search bar (top center) */
+  .searchbar{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:7;
+    display:flex;align-items:center;gap:10px;width:min(440px,44vw);padding:10px 16px;
+    border-radius:30px;border:1px solid rgba(255,255,255,.16);background:rgba(8,12,20,.6);
+    backdrop-filter:blur(10px)}
+  .searchbar .sg{color:var(--cyan)}
+  .searchbar input{flex:1;background:none;border:none;outline:none;color:var(--ink);font:inherit;font-size:13px}
+  .searchbar input::placeholder{color:var(--dim)}
+  .searchbar .sk{font-size:10px;color:var(--dim);border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:1px 6px}
+
+  /* example-query chips (under the search bar) */
+  .examples{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:6;display:flex;
+    flex-wrap:wrap;gap:6px;justify-content:center;width:min(620px,82vw)}
+  .examples.hide{display:none}
+  .examples .chip{cursor:pointer;font:inherit;font-size:10.5px;letter-spacing:.02em;padding:5px 11px;
+    border-radius:20px;border:1px solid rgba(0,229,255,.28);background:rgba(0,229,255,.06);
+    color:#bfe9ff;transition:.15s;text-shadow:0 1px 6px #000}
+  .examples .chip:hover{background:rgba(0,229,255,.16);border-color:var(--cyan);color:#fff}
+
+  /* results panel (right) */
+  .results{position:fixed;top:64px;right:26px;z-index:7;width:320px;max-height:70vh;display:flex;
+    flex-direction:column;border-radius:14px;border:1px solid rgba(255,255,255,.14);
+    background:rgba(8,12,20,.72);backdrop-filter:blur(14px);overflow:hidden}
+  .results[hidden]{display:none}
+  .r-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;font-size:11px;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--cyan);border-bottom:1px solid rgba(255,255,255,.08)}
+  .r-head button{background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px}
+  .r-list{overflow-y:auto;padding:8px}
+  .r-item{padding:10px 12px;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:.15s;margin-bottom:6px}
+  .r-item:hover{background:rgba(0,229,255,.06);border-color:rgba(0,229,255,.3)}
+  .r-top{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+  .r-top .sc{color:var(--amber)}
+  .r-prev{font-size:11px;line-height:1.45;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .r-empty{padding:14px;font-size:11px;color:var(--dim)}
+
+  /* hand schematic panel (bottom-left, above the debug line) */
+  #handviz{position:fixed;left:26px;bottom:50px;z-index:6;width:190px;padding:8px;
+    border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(8,12,20,.6);
+    backdrop-filter:blur(10px);pointer-events:none;display:none}
+  #handviz canvas{display:block;width:174px;height:116px}
+  #handcap{font-size:9px;letter-spacing:.14em;color:var(--dim);margin-top:5px;text-transform:uppercase}
+  #handcap b{color:var(--cyan)} #handcap .am{color:var(--amber)}
+</style>
+</head>
+<body>
+
+<video id="cam" playsinline muted></video>
+<canvas id="graph"></canvas>
+<div class="grain"></div>
+
+<div class="title">
+  <h1>exploring shapes of thoughts <span class="spark">✦</span></h1>
+  <p id="subtitle">cortex · live memory · webcam</p>
+</div>
+
+<div class="mode">
+  <div class="tag">mode: <b id="mode-name">distributed</b></div>
+  <div class="sub" id="mode-desc">notes connected by relationships via edges</div>
+</div>
+
+<div class="searchbar" id="searchbar">
+  <span class="sg">⌕</span>
+  <input id="q" type="text" placeholder="query the cortex…" autocomplete="off" spellcheck="false" />
+  <span class="sk">↵</span>
+</div>
+
+<div class="examples" id="examples"></div>
+
+<aside class="results" id="results" hidden>
+  <div class="r-head"><span>activations</span><button id="r-close">✕</button></div>
+  <div class="r-list" id="r-list"></div>
+</aside>
+
+<div class="switch">
+  <button data-auto>⊹ AUTO (hands)</button>
+  <button data-mode="distributed" class="active">DISTRIBUTED</button>
+  <button data-mode="centralized">CENTRALIZED</button>
+  <button data-mode="radial">MORPHOGENESIS</button>
+</div>
+
+<div class="hint">
+  <div><b>open hand</b> point · <b>quick pinch</b> target · <b>fist + move</b> drag · <b>two fists</b> zoom</div>
+  <div><b>1 hand</b> centralized · <b>2 hands</b> distributed · <b>wheel / drag / R</b> too</div>
+</div>
+<div class="dbg" id="cortex-dbg">hands <span class="hi">0</span></div>
+
+<div id="handviz">
+  <canvas id="handcv" width="174" height="116"></canvas>
+  <div id="handcap">hands —</div>
+</div>
+
+<div class="curtain" id="curtain">
+  <div class="curtain-card">
+    <h2>CORTEX · Topologies of Thought <span class="spark">✦</span></h2>
+    <p class="lede">A living map of an AI's memory — explore it with your hands, in front of your webcam.</p>
+
+    <div class="disclaimer">
+      <div class="d-title">🔒 Your camera never leaves this device</div>
+      <p>Hand tracking runs <b>entirely in your browser</b> (Google's MediaPipe model + WebAssembly).
+         No image, video, or camera frame is ever uploaded, stored, or sent anywhere — there is no
+         server-side vision at all. This page has <b>no backend</b>: the demo graph is a static file and
+         search runs entirely in your browser. Nothing about you is collected.</p>
+    </div>
+
+    <div class="how">
+      <div class="how-title">How it works</div>
+      <ul>
+        <li><b>In-browser vision.</b> MediaPipe Hands reads 21 landmarks per hand from the webcam,
+            on-device. Your fingertip becomes the pointer; finger postures are the commands.</li>
+        <li><b>Synthetic memory.</b> The 260 points are invented demo notes projected into a map.
+            There is no database and no live memory behind this — a frozen, self-contained snapshot.</li>
+        <li><b>Gestures.</b> Open hand points · fist grabs &amp; drags · two fists zoom · a quick pinch
+            targets a memory. One hand = centralized, two hands = distributed.</li>
+        <li><b>Client-side by design.</b> Detection, rendering, and search are 100% JavaScript in your
+            tab. Nothing touches a server — the whole demo is a static page.</li>
+      </ul>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="start" disabled>loading…</button>
+      <button class="btn ghost" id="nocam" disabled>mouse only</button>
+    </div>
+    <div class="status" id="status">projecting embeddings…</div>
+    <small>The webcam needs a secure context (HTTPS). Without a camera, the attractor follows your mouse.
+      Source on <a href="https://github.com/Akciali/cortex-demo" target="_blank" rel="noopener">GitHub</a>.</small>
+  </div>
+</div>
+
+<script type="module">
+// ============================================================================
+//  CORTEX · Topologies of Thought — AR overlay over a synthetic memory map.
+//  Dimmed webcam backdrop + 2D thought-graph loaded from a static graph.json
+//  (synthetic demo notes + links). The index fingertip is an attractor;
+//  topology morphs between distributed / centralized / morphogenesis.
+// ============================================================================
+
+const cam     = document.getElementById("cam");
+const canvas  = document.getElementById("graph");
+const ctx     = canvas.getContext("2d");
+const modeName= document.getElementById("mode-name");
+const modeDesc= document.getElementById("mode-desc");
+const statusEl= document.getElementById("status");
+const dbg     = document.getElementById("cortex-dbg");
+
+let DPR = Math.min(devicePixelRatio || 1, 2);
+function resize(){
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = innerWidth*DPR; canvas.height = innerHeight*DPR;
+  canvas.style.width = innerWidth+"px"; canvas.style.height = innerHeight+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener("resize", resize); resize();
+
+// ---- data (loaded from static graph.json) --------------------------------
+let nodes = [];     // {id,coll,tags,desc,importance,age,label,nx,ny,ph,amp,spd}
+let edges = [];     // [a,b] index pairs
+let adj = [];       // adjacency list of indices
+const view = { s:1, x:0, y:0 };   // 2D viewport: screen = base*s + (x,y)
+let idById = new Map();            // memory id -> node index
+let pinned = -1;                   // node index pinned from a search result
+let hitSet = new Set();            // node indices currently in the search hits
+const COLL_HUE = {
+  demo_research:"#6fd3ff", demo_infra:"#b6a4ff", demo_ideas:"#ffc98a", demo_journal:"#79e6c2",
+};
+const hueFor = c => COLL_HUE[c] || "rgba(235,243,255,.85)";
+
+
+let QUERIES = [];   // curated demo queries -> frozen hits (queries.json)
+async function loadGraph(){
+  if(window.__GRAPH__) return window.__GRAPH__;
+  const r = await fetch("graph.json", {cache:"force-cache"});
+  if(!r.ok) throw new Error("graph.json http "+r.status);
+  return await r.json();
+}
+async function loadQueries(){
+  if(window.__QUERIES__){ QUERIES = window.__QUERIES__; return; }
+  try{ const r = await fetch("queries.json", {cache:"force-cache"}); if(r.ok) QUERIES = await r.json(); }
+  catch(e){ QUERIES = []; }
+}
+
+function ingest(g){
+  const pts = g.points || [];
+  // robust normalization: map the 2nd–98th percentile span to the screen so a
+  // few UMAP outliers don't squash the whole cluster into one corner.
+  const xs=pts.map(p=>p.x).sort((a,b)=>a-b), ys=pts.map(p=>p.y).sort((a,b)=>a-b);
+  const pct=(a,q)=> a.length ? a[Math.min(a.length-1,Math.max(0,Math.round(q*(a.length-1))))] : 0;
+  const minX=pct(xs,0.02), maxX=pct(xs,0.98), minY=pct(ys,0.02), maxY=pct(ys,0.98);
+  const sx=(maxX-minX)||1, sy=(maxY-minY)||1;
+  const clamp01=v=>Math.max(0,Math.min(1,v));
+  nodes = pts.map(p=>{
+    const tags = p.tags || [];
+    const label = tags[0] || (p.preview||"").split(/\s+/).slice(0,3).join(" ") || p.type || "note";
+    return {
+      id:p.id, coll:p.collection, tags, desc:p.preview||"", importance:p.importance??0.5,
+      label,
+      nx: 0.06 + clamp01((p.x-minX)/sx)*0.88,
+      ny: 0.10 + clamp01((p.y-minY)/sy)*0.80,
+      ph: Math.random()*6.28, amp: 0.0028+Math.random()*0.004, spd: 0.15+Math.random()*0.3,
+    };
+  });
+  idById = new Map(nodes.map((n,i)=>[n.id,i]));
+  edges = []; adj = nodes.map(()=>[]);
+  for(const l of (g.links||[])){
+    const a=idById.get(l.source), b=idById.get(l.target);
+    if(a===undefined||b===undefined||a===b) continue;
+    edges.push([a,b]); adj[a].push(b); adj[b].push(a);
+  }
+  document.getElementById("subtitle").textContent =
+    `cortex · ${nodes.length} memories · ${Object.keys(g.counts||{}).length} regions · webcam`;
+}
+
+function sharedTag(i,j){
+  const t = new Set(nodes[i].tags);
+  for(const x of nodes[j].tags) if(t.has(x)) return x;
+  return null;
+}
+
+// ---- mode -----------------------------------------------------------------
+const MODES = {
+  distributed:{ name:"distributed", desc:"memories linked by their semantic edges" },
+  centralized:{ name:"centralized", desc:"one focal thought connected to all others" },
+  radial:     { name:"morphogenesis", desc:"structure radiating from a single seed" },
+};
+let mode="distributed", autoMode=false;
+function refreshButtons(){
+  document.querySelectorAll(".switch button").forEach(b=>{
+    if(b.hasAttribute("data-auto")) b.classList.toggle("active", autoMode);
+    else b.classList.toggle("active", !autoMode && b.dataset.mode===mode);
+  });
+}
+function setMode(m){
+  if(m!==mode){ mode=m; modeName.textContent=MODES[m].name; modeDesc.textContent=MODES[m].desc; }
+  refreshButtons();
+}
+document.querySelectorAll(".switch button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    if(b.hasAttribute("data-auto")){ autoMode=true; refreshButtons(); }
+    else { autoMode=false; setMode(b.dataset.mode); }
+  });
+});
+refreshButtons();
+
+// ---- hand tracking --------------------------------------------------------
+let landmarker=null, handActive=false, fingers=[], handCount=0, camErr="";
+let navState=null, navMode="";   // pinch-driven pan/zoom state
+let handsRaw=[], handInfo=[];     // latest landmarks + per-hand info for the hand panel
+const MODEL="https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+async function makeLandmarker(fs){
+  const { HandLandmarker } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
+  const base={ runningMode:"VIDEO", numHands:2 };
+  const tuned={ ...base, minHandDetectionConfidence:0.3, minHandPresenceConfidence:0.3, minTrackingConfidence:0.3 };
+  for(const delegate of ["GPU","CPU"]) for(const opts of [tuned,base]){
+    try{ return await HandLandmarker.createFromOptions(fs,{ baseOptions:{modelAssetPath:MODEL,delegate}, ...opts }); }
+    catch(e){ camErr=`model(${delegate}): ${e.message||e}`; }
+  }
+  throw new Error(camErr||"landmarker build failed");
+}
+
+async function initHands(){
+  try{
+    statusEl.textContent="requesting camera…";
+    cam.srcObject = await navigator.mediaDevices.getUserMedia({video:{width:1280,height:720},audio:false});
+    await cam.play(); cam.classList.remove("off");
+  }catch(err){ camErr="cam: "+(err.name||"")+" "+(err.message||err); cam.classList.add("off"); return false; }
+  try{
+    statusEl.textContent="loading hand model…";
+    const { FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
+    const fs = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+    landmarker = await makeLandmarker(fs); handActive=true; camErr=""; return true;
+  }catch(err){ camErr="model: "+(err.message||err); return false; }
+}
+
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+// nearest node index to a screen point (same projection as the render loop)
+function nearestNode(sx,sy){
+  const t=performance.now()/1000; let bi=-1, bd=(innerWidth*0.15)**2;
+  for(let i=0;i<nodes.length;i++){
+    const b=nodePos(nodes[i],t); const x=b.x*view.s+view.x, y=b.y*view.s+view.y;
+    const d=(x-sx)**2+(y-sy)**2; if(d<bd){bd=d;bi=i;}
+  }
+  return bi;
+}
+
+// extended-finger count (tip farther from wrist than its PIP joint) → posture
+function extendedFingers(lm){
+  const w=lm[0]; let c=0;
+  for(const [tip,pip] of [[8,6],[12,10],[16,14],[20,18]]) if(dist(lm[tip],w)>dist(lm[pip],w)*1.15) c++;
+  return c;
+}
+
+function readHand(now){
+  if(!landmarker || !handActive || cam.readyState<2) return;
+  let res; try{ res=landmarker.detectForVideo(cam,now); }catch(_){ return; }
+  const hands=res.landmarks||[]; handCount=hands.length;
+  const info = hands.map(h=>{
+    const tip=h[8], palm=h[9], hs=dist(h[0],h[9])||0.001, ext=extendedFingers(h);
+    return {
+      x:(1-tip.x)*innerWidth, y:tip.y*innerHeight,         // index tip (pointer)
+      px:(1-palm.x)*innerWidth, py:palm.y*innerHeight,     // palm center (fist anchor)
+      pinched:(dist(h[4],h[8])/hs)<0.5, fist: ext===0,
+    };
+  });
+  handsRaw=hands; handInfo=info;
+
+  // release of a quick pinch → TARGET the aimed memory (no hold required)
+  const stillAiming = hands.length===1 && info[0] && info[0].pinched && !info[0].fist;
+  if(navState && navState.type==="pinch1" && !stillAiming){
+    if((now-navState.t0)<450){ const tgt=nearestNode(navState.x0,navState.y0); if(tgt>=0){ pinned=tgt; centerOn(tgt); } }
+    navState=null; navMode="";
+  }
+
+  if(hands.length===0){ fingers=[]; navState=null; navMode=""; return; }
+
+  // ---- two fists → zoom (move apart / together) ----
+  if(hands.length>=2 && info[0].fist && info[1].fist){
+    const a=info[0], b=info[1], d=Math.hypot(a.px-b.px,a.py-b.py), mid={x:(a.px+b.px)/2,y:(a.py+b.py)/2};
+    if(!navState || navState.type!=="zoom") navState={type:"zoom", d0:d, s0:view.s};
+    else { const ns=clampS(navState.s0*(d/Math.max(navState.d0,1))), k=ns/view.s;
+           view.x=mid.x-(mid.x-view.x)*k; view.y=mid.y-(mid.y-view.y)*k; view.s=ns; }
+    fingers=[]; navMode="ZOOM"; return;
+  }
+
+  if(hands.length===1){
+    const inf=info[0];
+    // ---- FIST → position-control pan (grab & drag 1:1; stop = stop, open = release) ----
+    if(inf.fist){
+      if(!navState || navState.type!=="fistpan") navState={type:"fistpan", lx:inf.px, ly:inf.py};
+      else { view.x += inf.px-navState.lx; view.y += inf.py-navState.ly; }
+      navState.lx=inf.px; navState.ly=inf.py;
+      fingers=[]; navMode="PAN"; return;
+    }
+    // ---- quick PINCH → aim, target fires on release (above) ----
+    if(inf.pinched){
+      if(!navState || navState.type!=="pinch1") navState={type:"pinch1", t0:now, x0:inf.x, y0:inf.y};
+      fingers=[{x:inf.x,y:inf.y}]; navMode="AIM"; return;
+    }
+  }
+
+  navState=null; navMode="";
+  // ---- open hands → attractor + auto topology ----
+  fingers = info.map((p,i)=>{ const prev=fingers[i];
+    return prev?{x:prev.x+(p.x-prev.x)*0.35,y:prev.y+(p.y-prev.y)*0.35}:{x:p.x,y:p.y}; });
+  if(autoMode){ const want=hands.length>=2?"distributed":"centralized"; if(mode!==want) setMode(want); }
+}
+addEventListener("mousemove",e=>{ if(!handActive) fingers=[{x:e.clientX,y:e.clientY}]; });
+
+// ---- navigation: zoom (wheel→cursor) + pan (drag) + keyboard --------------
+function clampS(s){ return Math.max(0.3, Math.min(7, s)); }
+function zoomAt(cx,cy,f){ const ns=clampS(view.s*f), k=ns/view.s;
+  view.x = cx-(cx-view.x)*k; view.y = cy-(cy-view.y)*k; view.s=ns; }
+canvas.addEventListener("wheel",e=>{ e.preventDefault();
+  zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY*0.0015)); },{passive:false});
+let dragging=false, lastPan=null;
+canvas.addEventListener("mousedown",e=>{ if(e.button===0){ dragging=true; lastPan={x:e.clientX,y:e.clientY}; canvas.style.cursor="grabbing"; }});
+addEventListener("mouseup",()=>{ dragging=false; canvas.style.cursor=""; });
+addEventListener("mousemove",e=>{ if(dragging&&lastPan){ view.x+=e.clientX-lastPan.x; view.y+=e.clientY-lastPan.y; lastPan={x:e.clientX,y:e.clientY}; }});
+addEventListener("keydown",e=>{
+  if(e.target && e.target.tagName==="INPUT") return;   // don't pan/zoom while typing
+  const d=70;
+  if(e.key==="+"||e.key==="=") zoomAt(innerWidth/2,innerHeight/2,1.15);
+  else if(e.key==="-"||e.key==="_") zoomAt(innerWidth/2,innerHeight/2,1/1.15);
+  else if(e.key==="ArrowLeft"||e.key==="a") view.x+=d;
+  else if(e.key==="ArrowRight"||e.key==="d") view.x-=d;
+  else if(e.key==="ArrowUp"||e.key==="w") view.y+=d;
+  else if(e.key==="ArrowDown"||e.key==="s") view.y-=d;
+  else if(e.key==="0"||e.key.toLowerCase()==="r"){ view.s=1; view.x=0; view.y=0; }
+});
+
+// ---- drawing --------------------------------------------------------------
+function nodePos(n,t){
+  return { x:(n.nx+Math.cos(n.ph+t*n.spd)*n.amp)*innerWidth,
+           y:(n.ny+Math.sin(n.ph+t*n.spd*0.8)*n.amp)*innerHeight };
+}
+function line(a,b,alpha,w){ ctx.strokeStyle=`rgba(235,243,255,${alpha})`; ctx.lineWidth=w||1;
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+function dot(p,r,fill){ ctx.fillStyle=fill; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,6.283); ctx.fill(); }
+function label(p,text,color,size,dx,dy){ ctx.font=`${size||11}px "SF Mono",monospace`; ctx.fillStyle=color;
+  ctx.fillText(text,p.x+(dx||8),p.y+(dy||-8)); }
+function brackets(p,s,color){
+  ctx.strokeStyle=color||"rgba(255,255,255,.85)"; ctx.lineWidth=1.3; const o=s,len=7;
+  const c=(ax,ay,bx,by,cx,cy)=>{ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(cx,cy);ctx.stroke();};
+  c(p.x-o,p.y-o+len,p.x-o,p.y-o,p.x-o+len,p.y-o);
+  c(p.x+o-len,p.y-o,p.x+o,p.y-o,p.x+o,p.y-o+len);
+  c(p.x-o,p.y+o-len,p.x-o,p.y+o,p.x-o+len,p.y+o);
+  c(p.x+o-len,p.y+o,p.x+o,p.y+o,p.x+o,p.y+o-len);
+}
+function wrap(text,x,y,maxW,lh,color,size){
+  ctx.font=`${size}px "SF Mono",monospace`; ctx.fillStyle=color;
+  const words=text.split(" "); let s="",yy=y;
+  for(const w of words){ const test=s?s+" "+w:w;
+    if(ctx.measureText(test).width>maxW){ ctx.fillText(s,x,yy); s=w; yy+=lh; if(yy>y+lh*5){ctx.fillText(s+"…",x,yy);return;} }
+    else s=test; }
+  ctx.fillText(s,x,yy);
+}
+
+// ---- hand schematic panel -------------------------------------------------
+const HBONES=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const handviz=document.getElementById("handviz");
+const hcv=document.getElementById("handcv"), hctx=hcv.getContext("2d");
+const hcap=document.getElementById("handcap");
+function drawHandViz(){
+  handviz.style.display = handActive ? "block" : "none";
+  if(!handActive) return;
+  const W=hcv.width, H=hcv.height; hctx.clearRect(0,0,W,H);
+  handsRaw.forEach((lm,k)=>{
+    const hi = handInfo[k] || {};
+    const col = (hi.pinched||hi.fist) ? "rgba(255,174,92,.95)" : "rgba(0,229,255,.9)";
+    hctx.strokeStyle=col; hctx.lineWidth=1.6; hctx.fillStyle=col;
+    hctx.beginPath();
+    for(const [a,b] of HBONES){ hctx.moveTo((1-lm[a].x)*W,lm[a].y*H); hctx.lineTo((1-lm[b].x)*W,lm[b].y*H); }
+    hctx.stroke();
+    for(const p of lm){ hctx.beginPath(); hctx.arc((1-p.x)*W,p.y*H,2,0,6.283); hctx.fill(); }
+  });
+  const g = navMode || (fingers.length>=2?"ATTRACTOR ×2":fingers.length===1?"ATTRACTOR":"—");
+  const cls = (navMode==="PAN"||navMode==="ZOOM"||navMode==="AIM") ? "am" : "b";
+  hcap.innerHTML = `hands <b>${handCount}</b> · <span class="${cls}">${g}</span>`;
+}
+
+const CAP = 180;   // max lines drawn from a single seed/core (perf + clarity)
+function frame(now){
+  readHand(now);
+  dbg.innerHTML = `hands <span class="hi">${handCount}</span>${navMode?` <span class="hi">${navMode}</span>`:""} · ${mode} · ${autoMode?"AUTO":"manual"} · z${view.s.toFixed(1)}`
+    + (camErr?` · <span class="hi">${camErr}</span>`:"");
+  ctx.clearRect(0,0,innerWidth,innerHeight);
+  const t=now/1000;
+  const P = nodes.map(n=>{ const b=nodePos(n,t); return { x:b.x*view.s+view.x, y:b.y*view.s+view.y }; });
+
+  // focus node per finger
+  const focusIdx=[], focusSet=new Set(); const maxR2=(innerWidth*0.15)**2;
+  for(const f of fingers){
+    let bi=-1,bd=maxR2;
+    for(let i=0;i<P.length;i++){ const d=(P[i].x-f.x)**2+(P[i].y-f.y)**2; if(d<bd){bd=d;bi=i;} }
+    focusIdx.push(bi); if(bi>=0) focusSet.add(bi);
+  }
+
+  if(mode==="distributed"){
+    for(const [a,b] of edges) line(P[a],P[b],0.07,1);            // faint real mesh
+    fingers.forEach((f,fi)=>{
+      const idx=focusIdx[fi]; if(idx<0) return;
+      const nbrs=adj[idx];
+      nbrs.forEach((j,k)=>{
+        line(P[idx],P[j],0.5,1.4);
+        if(k===0){ const st=sharedTag(idx,j); const mid={x:(P[idx].x+P[j].x)/2,y:(P[idx].y+P[j].y)/2};
+          label(mid, st?("↔ "+st):nodes[j].label, "rgba(255,174,92,.92)", 11, 0, -4); }
+      });
+    });
+  }
+  else if(mode==="centralized"){
+    const cores = fingers.length?fingers:[{x:innerWidth/2,y:innerHeight/2}];
+    // each node binds to its nearest core, alpha by distance, capped per core
+    const perCore = cores.map(()=>[]);
+    for(let i=0;i<P.length;i++){
+      let c=0,cd=Infinity; for(let k=0;k<cores.length;k++){ const d=(cores[k].x-P[i].x)**2+(cores[k].y-P[i].y)**2; if(d<cd){cd=d;c=k;} }
+      perCore[c].push([i,cd]);
+    }
+    cores.forEach((core,k)=>{
+      perCore[k].sort((u,v)=>u[1]-v[1]);
+      const list=perCore[k].slice(0,CAP);
+      for(const [i,d2] of list){ const a=Math.max(0.05,0.45-Math.sqrt(d2)/(innerWidth*0.9)); line(core,P[i],a,1); }
+      dot(core,5,"rgba(0,229,255,.9)");
+      ctx.strokeStyle="rgba(0,229,255,.5)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(core.x,core.y,16+4*Math.sin(t*3),0,6.283); ctx.stroke();
+    });
+  }
+  else if(mode==="radial"){
+    const seeds = fingers.length?fingers:[{x:innerWidth/2,y:innerHeight/2}];
+    for(const seed of seeds){
+      const near=[];
+      for(let i=0;i<P.length;i++){ const d=(P[i].x-seed.x)**2+(P[i].y-seed.y)**2; near.push([i,d]); }
+      near.sort((u,v)=>u[1]-v[1]);
+      for(const [i] of near.slice(0,CAP)){
+        const dx=P[i].x-seed.x, dy=P[i].y-seed.y, len=Math.hypot(dx,dy)||1;
+        const ext={x:seed.x+dx/len*(len*1.16), y:seed.y+dy/len*(len*1.16)};
+        line(seed,ext,0.16,1); dot(ext,1.4,"rgba(235,243,255,.5)");
+      }
+      dot(seed,4,"rgba(255,174,92,.95)");
+    }
+  }
+
+  // nodes
+  for(let i=0;i<P.length;i++){
+    const n=nodes[i], focused=focusSet.has(i);
+    const r = focused ? 4 : (1.6 + n.importance*1.8);
+    dot(P[i], r, focused ? "#fff" : hueFor(n.coll));
+    if(hitSet.has(i)){ ctx.strokeStyle="rgba(0,229,255,.7)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(P[i].x,P[i].y,5.5,0,6.283); ctx.stroke(); }
+  }
+  // focus detail (real memory content)
+  focusSet.forEach(i=>{
+    const n=nodes[i], p=P[i];
+    brackets(p,22);
+    label(p, n.coll.replace("demo_",""), "rgba(0,229,255,.9)", 10, 14, -18);
+    label(p, n.label, "#fff", 13, 14, -4);
+    wrap(n.desc, p.x+14, p.y+14, 240, 14, "rgba(255,174,92,.92)", 11);
+    if(n.tags.length) label(p, n.tags.slice(0,4).join(" · "), "rgba(160,176,200,.7)", 9, 14, 14+14*Math.min(5,Math.ceil(ctx.measureText(n.desc).width/240))+6);
+  });
+
+  // pinned memory (from a search result) — cyan brackets + content, persists
+  if(pinned>=0 && pinned<P.length){
+    const n=nodes[pinned], p=P[pinned];
+    ctx.strokeStyle="rgba(0,229,255,.9)"; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.arc(p.x,p.y,8+2*Math.sin(t*3),0,6.283); ctx.stroke();
+    brackets(p,24,"rgba(0,229,255,.9)");
+    label(p, n.coll.replace("demo_",""), "rgba(0,229,255,.95)", 10, 16, -18);
+    label(p, n.label, "#fff", 13, 16, -4);
+    wrap(n.desc, p.x+16, p.y+14, 240, 14, "rgba(255,174,92,.92)", 11);
+  }
+
+  // fingertip markers
+  for(const f of fingers){
+    ctx.strokeStyle="rgba(0,229,255,.85)"; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(f.x,f.y,9,0,6.283); ctx.stroke();
+    dot(f,2.4,"rgba(0,229,255,.95)");
+  }
+  drawHandViz();
+  requestAnimationFrame(frame);
+}
+
+// ---- search (client-side: curated queries + lexical fallback) -------------
+const qInput=document.getElementById("q");
+const examplesEl=document.getElementById("examples");
+const resultsEl=document.getElementById("results");
+const rList=document.getElementById("r-list");
+function escapeHtml(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+const wordsOf = s => (s||"").toLowerCase().match(/[a-z0-9]+/g) || [];
+function matchCurated(q){
+  const ql=q.toLowerCase().trim(); let best=null, bestScore=0;
+  for(const c of QUERIES){
+    const cl=c.query.toLowerCase(); let s=0;
+    if(cl===ql) s=100;
+    else if(cl.includes(ql)||ql.includes(cl)) s=50;
+    else { const a=new Set(wordsOf(cl)); s=wordsOf(ql).filter(w=>w.length>2&&a.has(w)).length; }
+    if(s>bestScore){ bestScore=s; best=c; }
+  }
+  return bestScore>=2 ? best : null;
+}
+function lexicalSearch(q){
+  const terms=wordsOf(q).filter(w=>w.length>2); if(!terms.length) return [];
+  const out=[];
+  for(const n of nodes){
+    const hay=(n.desc+" "+n.tags.join(" ")+" "+n.label+" "+n.coll).toLowerCase();
+    let s=0; for(const t of terms) if(hay.includes(t)) s++;
+    if(s>0) out.push({id:n.id, collection:n.coll, score:Math.min(0.95,0.5+s*0.12), preview:n.desc, _s:s});
+  }
+  out.sort((a,b)=>(b._s-a._s)||(b.score-a.score));
+  return out.slice(0,10);
+}
+// fully client-side: curated frozen hits first, graceful lexical fallback otherwise
+function runSearch(q){
+  q=(q||"").trim(); if(!q) return;
+  qInput.value=q;
+  resultsEl.hidden=false; examplesEl.classList.add("hide");
+  const cur=matchCurated(q);
+  renderResults(cur ? cur.hits : lexicalSearch(q));
+}
+function renderResults(hits){
+  hitSet=new Set();
+  if(!hits.length){ rList.innerHTML='<div class="r-empty">no activation found</div>'; return; }
+  rList.innerHTML="";
+  for(const h of hits){
+    const i=idById.get(h.id); if(i!==undefined) hitSet.add(i);
+    const el=document.createElement("div"); el.className="r-item";
+    el.innerHTML=`<div class="r-top"><span>${escapeHtml((h.collection||"").replace("demo_",""))}</span><span class="sc">${Math.round((h.score||0)*100)/100}</span></div>`
+               + `<div class="r-prev">${escapeHtml(h.preview)}</div>`;
+    el.addEventListener("click",()=>selectHit(h.id));
+    rList.appendChild(el);
+  }
+}
+function selectHit(id){ const i=idById.get(id); if(i===undefined) return; pinned=i; centerOn(i); }
+function centerOn(i){
+  const n=nodes[i], bx=n.nx*innerWidth, by=n.ny*innerHeight;
+  view.s=Math.max(view.s,1.8);
+  view.x=innerWidth/2 - bx*view.s; view.y=innerHeight/2 - by*view.s;
+}
+qInput.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); runSearch(qInput.value); } e.stopPropagation(); });
+document.getElementById("r-close").addEventListener("click",()=>{ resultsEl.hidden=true; hitSet=new Set(); examplesEl.classList.remove("hide"); });
+addEventListener("keydown",e=>{ if(e.key==="Escape"){ pinned=-1; hitSet=new Set(); resultsEl.hidden=true; examplesEl.classList.remove("hide"); } });
+function buildChips(){
+  examplesEl.innerHTML="";
+  for(const c of QUERIES){
+    const b=document.createElement("button"); b.className="chip"; b.type="button";
+    b.textContent=c.query; b.addEventListener("click",()=>runSearch(c.query));
+    examplesEl.appendChild(b);
+  }
+}
+
+// ---- boot -----------------------------------------------------------------
+document.getElementById("start").addEventListener("click",async e=>{
+  e.target.disabled=true;
+  await initHands();
+  document.getElementById("curtain").classList.add("hide");
+});
+document.getElementById("nocam").addEventListener("click",()=>{
+  cam.classList.add("off");
+  document.getElementById("curtain").classList.add("hide");
+});
+
+(async function boot(){
+  try{
+    const g = await loadGraph();
+    ingest(g);
+    await loadQueries(); buildChips();
+    statusEl.textContent = `${nodes.length} memories loaded · ${edges.length} links`;
+    document.getElementById("start").disabled=false;
+    document.getElementById("start").textContent="✦ enter";
+    document.getElementById("nocam").disabled=false;
+  }catch(err){
+    statusEl.textContent = "⚠ "+(err.message||err);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+  <script>/* first-party view beacon — no cookies, no storage */(function(){try{if(!(navigator.sendBeacon&&navigator.sendBeacon('/_hit'))){fetch('/_hit',{method:'POST',keepalive:true,cache:'no-store'}).catch(function(){});}}catch(e){}})();</script>
+</body>
+</html>
